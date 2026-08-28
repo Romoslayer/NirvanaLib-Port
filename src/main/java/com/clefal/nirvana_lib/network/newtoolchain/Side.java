@@ -27,10 +27,12 @@ public enum Side
         return CLIENT;
     }
 
+    //? <26.2 {
     public static Side fromCM(@NotNull commonnetwork.networking.data.Side side){
         return switch (side){
             case CLIENT -> Side.CLIENT;
             case SERVER -> Side.SERVER;
         };
     }
+    //?}
 }

@@ -18,9 +18,8 @@
   },
   "depends": {
     "fabricloader": ">=${target_fabricloader}",
-    "fabric": "*",
+    "fabric-api": "*",
     "fzzy_config": ">=${fzzy_config_version}",
-    "minecraft": "=${target_minecraft}",
-    "commonnetworking": "*"
+    "minecraft": "=${target_minecraft}"
   }
 }

@@ -33,7 +33,7 @@ modstitch {
         "1.21.1" -> 21
         "1.21.4" -> 21
         "1.21.8", "1.21.10", "1.21.11" -> 21
-        "26.1.2" -> 25
+        "26.1.2", "26.2" -> 25
         else -> throw IllegalArgumentException("Please store the java version for ${property("deps.minecraft")} in build.gradle.kts!")
     }
 
@@ -78,6 +78,7 @@ modstitch {
                     "1.21.10" -> 69
                     "1.21.11" -> 70.0
                     "26.1.2" -> 84.0
+                    "26.2" -> 84.0
                     else -> throw IllegalArgumentException("Please store the resource pack version for ${property("deps.minecraft")} in build.gradle.kts! https://minecraft.wiki/w/Pack_format")
                 }.toString()
             )
@@ -110,14 +111,16 @@ modstitch {
     loom {
         // It's not recommended to store the Fabric Loader version in properties.
         // Make sure its up to date.
-        fabricLoaderVersion = "0.16.10"
+        fabricLoaderVersion = if (minecraft == "26.2") "0.19.3" else "0.16.10"
         configureLoom {
             runs {
                 all {
                     runDir = "../../run"
                     ideConfigGenerated(true)
                 }
-                accessWidenerPath.set(file("../../src/main/resources/${mid}.accesswidener"))
+                if (minecraft != "26.2") {
+                    accessWidenerPath.set(file("../../src/main/resources/${mid}.accesswidener"))
+                }
             }
             mixin.useLegacyMixinAp = false
 
@@ -156,7 +159,7 @@ modstitch {
         // true, it will automatically be generated.
         addMixinsToModManifest = true
         when (minecraft) {
-            "1.21.10", "1.21.8", "1.21.11", "26.1.2" -> configs.register("$mid.new_render")
+            "1.21.10", "1.21.8", "1.21.11", "26.1.2", "26.2" -> configs.register("$mid.new_render")
             else -> configs.register(mid)
         }
 
@@ -182,7 +185,7 @@ stonecutter {
         "forge" to loader.equals("forge"),
         "vanilla" to loader.equals("vanilla"),
         "legacy" to (minecraft == "1.20.1"),
-        "new_pipeline" to ((minecraft == "1.21.10") || (minecraft == "1.21.8") || (minecraft == "1.21.11") || (minecraft == "26.1.2"))
+        "new_pipeline" to ((minecraft == "1.21.10") || (minecraft == "1.21.8") || (minecraft == "1.21.11") || (minecraft == "26.1.2") || (minecraft == "26.2"))
 
     ))
 
@@ -204,7 +207,7 @@ stonecutter {
         replace("renderer.RenderType", "renderer.rendertype.RenderType")
     }
 
-    replacements.string(current.parsed.eq("26.1.2")) {
+    replacements.string(current.parsed.eq("26.1.2") || current.parsed.eq("26.2")) {
         replace("net.minecraft.client.gui.GuiGraphics", "net.minecraft.client.gui.GuiGraphicsExtractor")
         replace("GuiGraphics.class", "GuiGraphicsExtractor.class")
         replace("(GuiGraphics guiGraphics)", "(GuiGraphicsExtractor guiGraphics)")
@@ -280,12 +283,19 @@ dependencies {
         "1.21.8" -> "1.21.6"
         "1.21.10" -> "1.21.9"
         "26.1.2" -> "26.1"
+        "26.2" -> "26.2"
         else -> minecraft
     }
     var fzzyString : String = "";
 
-    "mysticdrew:common-networking-$loader:${property("deps.common_networking") as String}".runtimeOnly()
-    modstitchModCompileOnly ("mysticdrew:common-networking-$loader:${property("deps.common_networking") as String}")
+    // No 26.2 build of common-networking exists, and its 1.21.11 jar is intermediary-mapped so it
+    // can't resolve under 26.2's no-remap Loom flow anyway (see NetworkUtils.java gating). Unused
+    // in source for this target, so just omit the mod dependency entirely rather than pull in a
+    // "requires commonnetworking" fabric.mod.json entry the user can never satisfy.
+    if (minecraft != "26.2") {
+        "mysticdrew:common-networking-$loader:${property("deps.common_networking") as String}".runtimeOnly()
+        modstitchModCompileOnly ("mysticdrew:common-networking-$loader:${property("deps.common_networking") as String}")
+    }
 
     //fzzy
     modstitch.loom {
@@ -349,29 +359,30 @@ msPublishing {
         val finalFile = modstitch.finalJarTask.map { it.archiveFile.get() }
         file.set(finalFile)
         displayName = file.map { it.asFile.name }
-        val cfOptions = curseforgeOptions {
-            accessToken = file("D:\\curseforge-key.txt").readText()
-            projectId = "1164411"
-            minecraftVersions.add(minecraft)
-            requires("fzzy-config", "common-network")
+        if (file("D:\\curseforge-key.txt").exists()) {
+            val cfOptions = curseforgeOptions {
+                accessToken = file("D:\\curseforge-key.txt").readText()
+                projectId = "1164411"
+                minecraftVersions.add(minecraft)
+                requires("fzzy-config", "common-network")
+            }
+            curseforge("toCurseForge") {
+                from(cfOptions)
+            }
         }
 
-        // Modrinth options used by both Fabric and Forge
-        val mrOptions = modrinthOptions {
-            accessToken = file("D:\\modrinth-key.txt").readText()
-            version = "${loader}-${minecraft}-${modstitch.metadata.modVersion.get()}"
-            projectId = "6gKEW2ql"
-            minecraftVersions.add(minecraft)
-            requires("fzzy-config", "common-network")
-        }
-
-        curseforge("toCurseForge") {
-            from(cfOptions)
-        }
-
-
-        modrinth("toModrinth") {
-            from(mrOptions)
+        if (file("D:\\modrinth-key.txt").exists()) {
+            // Modrinth options used by both Fabric and Forge
+            val mrOptions = modrinthOptions {
+                accessToken = file("D:\\modrinth-key.txt").readText()
+                version = "${loader}-${minecraft}-${modstitch.metadata.modVersion.get()}"
+                projectId = "6gKEW2ql"
+                minecraftVersions.add(minecraft)
+                requires("fzzy-config", "common-network")
+            }
+            modrinth("toModrinth") {
+                from(mrOptions)
+            }
         }
 
 

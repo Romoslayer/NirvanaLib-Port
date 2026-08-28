@@ -3,7 +3,9 @@ package com.clefal.nirvana_lib.client.render.batch;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+//? !new_pipeline {
 import net.minecraft.client.renderer.MultiBufferSource;
+//?}
 //? new_pipeline {
 /*import net.minecraft.client.gui.render.state.GuiTextRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -28,10 +30,12 @@ public record DrawStringBufferInfo(String text, float x, float y, int color, boo
         return of(text, x, y, color, false, matrix);
     }
 
+    //? !new_pipeline {
     @Override
     public void upload(MultiBufferSource bufferSource) {
         Minecraft.getInstance().font.drawInBatch(text, x, y, color, dropShadow, matrix, bufferSource, displayMode, backgroundColor, packedLightCoords);
     }
+    //?}
     //? new_pipeline {
     /*public GuiTextRenderState toRenderState(GuiGraphics guiGraphics){
         //? <1.21.11{

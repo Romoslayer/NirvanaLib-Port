@@ -13,7 +13,9 @@ import net.minecraft.client.gui.GuiGraphics;
 //? new_pipeline {
 /*import com.clefal.nirvana_lib.mixin.GuiGraphicsAccessor;
 *///?}
+//? !new_pipeline {
 import net.minecraft.client.renderer.MultiBufferSource;
+//?}
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.*;

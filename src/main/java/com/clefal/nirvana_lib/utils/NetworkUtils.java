@@ -3,33 +3,44 @@ package com.clefal.nirvana_lib.utils;
 
 import com.clefal.nirvana_lib.NirvanaLibConstants;
 
+//? <26.2 {
 import com.clefal.nirvana_lib.network.newtoolchain.ModPacket;
 import com.clefal.nirvana_lib.network.newtoolchain.Side;
 import commonnetwork.api.Dispatcher;
 import commonnetwork.api.Network;
+//?}
 import lombok.experimental.UtilityClass;
 
 
-//? !legacy {
+//? !legacy && <26.2 {
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.StreamDecoder;
 //?}
 
 import java.util.ArrayList;
+//? <26.2 {
 import java.util.function.Supplier;
+//?}
 
+//? <26.2 {
 import net.minecraft.network.FriendlyByteBuf;
+//?}
 
 import net.minecraft.resources.ResourceLocation;
 
+//? <26.2 {
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+//?}
 
 
 
 @UtilityClass
 public class NetworkUtils {
 
+    // mysticdrew's common-networking library has no build published for 26.2 fabric yet,
+    // and its 1.21.11 jar is intermediary-mapped so it can't resolve under 26.2's no-remap Loom flow.
+    //? <26.2 {
     public <T> void sendToClient(T msg, ServerPlayer player) {
         Dispatcher.sendToClient(msg, player);
     }
@@ -64,9 +75,10 @@ public class NetworkUtils {
             msg.read(buf);
             return msg;
         }, x -> x.message().handle(x.sender(), x.message(), Side.fromCM(x.side())));
-        
+
         *///?}
     }
+    //?}
 
 
     public static ResourceLocation classToResourceLocation(Class<?> clas) {
