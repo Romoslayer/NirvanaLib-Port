@@ -11,7 +11,12 @@ public class StringListValue extends ConfigValue<List<String>>{
 
     @Override
     public void write(FriendlyByteBuf buf) {
-        buf.writeCollection(value, FriendlyByteBuf::writeUtf);
+        // MC 26.3 dropped FriendlyByteBuf's collection helpers; write the same wire format
+        // (varint length prefix + elements) by hand so every target compiles.
+        buf.writeVarInt(value.size());
+        for (String s : value) {
+            buf.writeUtf(s);
+        }
     }
 
     @Override

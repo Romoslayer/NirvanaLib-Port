@@ -33,7 +33,7 @@ modstitch {
         "1.21.1" -> 21
         "1.21.4" -> 21
         "1.21.8", "1.21.10", "1.21.11" -> 21
-        "26.1.2", "26.2" -> 25
+        "26.1.2", "26.2", "26.3" -> 25
         else -> throw IllegalArgumentException("Please store the java version for ${property("deps.minecraft")} in build.gradle.kts!")
     }
 
@@ -69,8 +69,7 @@ modstitch {
             // You can put any other replacement properties/metadata here that
             // modstitch doesn't initially support. Some examples below.
             put("mod_issue_tracker", "https://github.com/TUsama/Loot-Beams-Refork/issues")
-            put(
-                "pformat", when (property("deps.minecraft")) {
+            val packFormat = when (property("deps.minecraft")) {
                     "1.20.1" -> 15
                     "1.21.1" -> 34
                     "1.21.4" -> 46
@@ -79,11 +78,21 @@ modstitch {
                     "1.21.11" -> 70.0
                     "26.1.2" -> 84.0
                     "26.2" -> 84.0
+                    "26.3" -> 97
                     else -> throw IllegalArgumentException("Please store the resource pack version for ${property("deps.minecraft")} in build.gradle.kts! https://minecraft.wiki/w/Pack_format")
-                }.toString()
-            )
+            }.toString()
+            put("pformat", packFormat)
 
             put("target_minecraft", minecraft)
+            // MC 26.3 replaced pack.mcmeta's "pack_format" with "min_format"/"max_format" (the
+            // latter carrying the minor version). Leaving the old key makes the loader log
+            // "Error reading optional pack metadata ... attempting fallback type" on every launch.
+            put(
+                "pack_format_entry", when (property("deps.minecraft")) {
+                    "26.3" -> "\"min_format\": 97, \"max_format\": [97, 1]"
+                    else -> "\"pack_format\": $packFormat"
+                }
+            )
             //put("target_lib", property("deps.lib") as String)
             put(
                 "target_loader", when (loader) {
@@ -104,6 +113,18 @@ modstitch {
 
             put("fzzy_config_version", property("deps.fzzy_config_version") as String)
             put("common_networking", property("deps.common_networking") as String)
+            // common-networking has no 26.2+ build, and the dependencies block above already
+            // omits it for those targets. Keep the mod metadata in sync so the NeoForge jar
+            // doesn't demand a mod that cannot exist for this Minecraft version.
+            put(
+                "common_networking_dependency",
+                if (minecraft == "26.2" || minecraft == "26.3") "" else """
+                    [[dependencies.$mid]]
+                        modId = "commonnetworking"
+                        versionRange = "${property("deps.common_networking")}"
+                        mandatory = true
+                """.trimIndent()
+            )
         }
     }
 
@@ -111,14 +132,18 @@ modstitch {
     loom {
         // It's not recommended to store the Fabric Loader version in properties.
         // Make sure its up to date.
-        fabricLoaderVersion = if (minecraft == "26.2") "0.19.3" else "0.16.10"
+        fabricLoaderVersion = when (minecraft) {
+            "26.3" -> "0.19.5"
+            "26.2" -> "0.19.3"
+            else -> "0.16.10"
+        }
         configureLoom {
             runs {
                 all {
                     runDir = "../../run"
                     ideConfigGenerated(true)
                 }
-                if (minecraft != "26.2") {
+                if (minecraft != "26.2" && minecraft != "26.3") {
                     accessWidenerPath.set(file("../../src/main/resources/${mid}.accesswidener"))
                 }
             }
@@ -159,7 +184,7 @@ modstitch {
         // true, it will automatically be generated.
         addMixinsToModManifest = true
         when (minecraft) {
-            "1.21.10", "1.21.8", "1.21.11", "26.1.2", "26.2" -> configs.register("$mid.new_render")
+            "1.21.10", "1.21.8", "1.21.11", "26.1.2", "26.2", "26.3" -> configs.register("$mid.new_render")
             else -> configs.register(mid)
         }
 
@@ -185,7 +210,7 @@ stonecutter {
         "forge" to loader.equals("forge"),
         "vanilla" to loader.equals("vanilla"),
         "legacy" to (minecraft == "1.20.1"),
-        "new_pipeline" to ((minecraft == "1.21.10") || (minecraft == "1.21.8") || (minecraft == "1.21.11") || (minecraft == "26.1.2") || (minecraft == "26.2"))
+        "new_pipeline" to ((minecraft == "1.21.10") || (minecraft == "1.21.8") || (minecraft == "1.21.11") || (minecraft == "26.1.2") || (minecraft == "26.2") || (minecraft == "26.3"))
 
     ))
 
@@ -207,12 +232,21 @@ stonecutter {
         replace("renderer.RenderType", "renderer.rendertype.RenderType")
     }
 
-    replacements.string(current.parsed.eq("26.1.2") || current.parsed.eq("26.2")) {
+    replacements.string(current.parsed.eq("26.1.2") || current.parsed.eq("26.2") || current.parsed.eq("26.3")) {
         replace("net.minecraft.client.gui.GuiGraphics", "net.minecraft.client.gui.GuiGraphicsExtractor")
         replace("GuiGraphics.class", "GuiGraphicsExtractor.class")
         replace("(GuiGraphics guiGraphics)", "(GuiGraphicsExtractor guiGraphics)")
         replace(", GuiGraphics guiGraphics", ", GuiGraphicsExtractor guiGraphics")
         replace("net.minecraft.client.gui.render.state", "net.minecraft.client.renderer.state.gui")
+    }
+
+    // MC 26.3 moved the GPU abstraction layer out of com.mojang.blaze3d into the new
+    // com.mojang.renderpearl library (OpenGL + Vulkan backends). Only the handful of types this
+    // mod touches are remapped here; DefaultVertexFormat/VertexConsumer/RenderSystem stayed put.
+    replacements.string(current.parsed >= "26.3") {
+        replace("com.mojang.blaze3d.pipeline.RenderPipeline", "com.mojang.renderpearl.api.pipeline.RenderPipeline")
+        replace("com.mojang.blaze3d.textures.GpuTextureView", "com.mojang.renderpearl.api.textures.GpuTextureView")
+        replace("com.mojang.blaze3d.vertex.VertexFormat", "com.mojang.renderpearl.api.vertex.VertexFormat")
     }
 
     replacements.regex(current.parsed >= "1.21.11") {
@@ -284,6 +318,7 @@ dependencies {
         "1.21.10" -> "1.21.9"
         "26.1.2" -> "26.1"
         "26.2" -> "26.2"
+        "26.3" -> "26.3"
         else -> minecraft
     }
     var fzzyString : String = "";
@@ -292,7 +327,7 @@ dependencies {
     // can't resolve under 26.2's no-remap Loom flow anyway (see NetworkUtils.java gating). Unused
     // in source for this target, so just omit the mod dependency entirely rather than pull in a
     // "requires commonnetworking" fabric.mod.json entry the user can never satisfy.
-    if (minecraft != "26.2") {
+    if (minecraft != "26.2" && minecraft != "26.3") {
         "mysticdrew:common-networking-$loader:${property("deps.common_networking") as String}".runtimeOnly()
         modstitchModCompileOnly ("mysticdrew:common-networking-$loader:${property("deps.common_networking") as String}")
     }
@@ -319,8 +354,14 @@ dependencies {
 
     }
 
-    modstitchModCompileOnly(fzzyString)
-    (fzzyString).runtimeOnly()
+    // fzzy_config has no NeoForge build published for 26.3 yet (only the Fabric one). Nothing in
+    // this mod's source touches its API, so skip the dependency for that one target instead of
+    // failing the build; the generated mod metadata still requires it at runtime. Remove this
+    // guard once me.fzzyhmstrs:fzzy_config:<version>+26.3+neoforge is published.
+    if (!(minecraft == "26.3" && loader == "neoforge")) {
+        modstitchModCompileOnly(fzzyString)
+        (fzzyString).runtimeOnly()
+    }
 
     //loader-specified deps
     DependencyConfig.getDependencies(loader, minecraft).forEach { dep ->
@@ -338,6 +379,19 @@ dependencies {
     modstitchImplementation("net.neoforged:bus:8.0.5")
 
     modstitchImplementation("com.google.code.findbugs:jsr305:3.0.2")
+}
+
+// Loot Beams consumes this library from mavenLocal on the 26.x targets, where no Modrinth build
+// exists yet. Qualify the 26.3 coordinate so publishing it doesn't overwrite the 26.2 artifact
+// that the 26.2 targets still build against. Note the Fabric target produces only a dev-fat jar
+// (the shadow plugin owns its final artifact), so this publishes the NeoForge build, exactly as
+// the 26.2 setup does; a Fabric dev run needs the dev-fat jar dropped into its run/mods folder.
+if (minecraft == "26.3") {
+    extensions.configure<PublishingExtension>("publishing") {
+        publications.withType<MavenPublication>().configureEach {
+            version = "$modv+$minecraft"
+        }
+    }
 }
 
 msPublishing {

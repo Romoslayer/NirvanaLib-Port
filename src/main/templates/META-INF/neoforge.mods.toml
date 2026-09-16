@@ -26,7 +26,4 @@ license = "${mod_license}"
     modId = "fzzy_config"
     versionRange = "[${fzzy_config_version},)"
     type = "required"
-[[dependencies.${mod_id}]]
-    modId = "commonnetworking"
-    versionRange = "${common_networking}"
-    mandatory = true
+${common_networking_dependency}

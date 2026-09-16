@@ -22,3 +22,9 @@ build
 eclipse
 run
 /fabric/runs
+
+# AI assistant session artifacts
+HANDOFF.md
+.claude/
+CLAUDE.md
+AGENTS.md

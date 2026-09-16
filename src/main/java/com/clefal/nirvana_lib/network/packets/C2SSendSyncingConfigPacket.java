@@ -43,7 +43,11 @@ public class C2SSendSyncingConfigPacket implements C2SModPacket<C2SSendSyncingCo
         for (Map.Entry<String, ConfigValue<?>> e : map.entrySet()) {
             tokens.add(e.getValue().getToken());
         }
-        buf.writeCollection(tokens, (buf1, aByte) -> buf1.writeByte(aByte));
+        // MC 26.3 dropped FriendlyByteBuf's collection helpers; same wire format, written by hand.
+        buf.writeVarInt(tokens.size());
+        for (Byte token : tokens) {
+            buf.writeByte(token);
+        }
 
         for (Map.Entry<String, ConfigValue<?>> e : map.entrySet()) {
             buf.writeUtf(e.getKey());
@@ -54,7 +58,11 @@ public class C2SSendSyncingConfigPacket implements C2SModPacket<C2SSendSyncingCo
     @Override
     public void read(FriendlyByteBuf buf) {
         this.player = buf.readUUID();
-        List<Byte> bytes = buf.readList(FriendlyByteBuf::readByte);
+        int tokenCount = buf.readVarInt();
+        List<Byte> bytes = new ArrayList<>(tokenCount);
+        for (int i = 0; i < tokenCount; i++) {
+            bytes.add(buf.readByte());
+        }
 
         Map<String, ConfigValue<?>> map = new LinkedHashMap<>();
 
@@ -64,8 +72,14 @@ public class C2SSendSyncingConfigPacket implements C2SModPacket<C2SSendSyncingCo
             switch (token) {
                 case 0 -> value = new BooleanValue(buf.readBoolean());
                 case 1 -> value = new IntegerValue(((Byte) buf.readByte()).intValue());
-                case 2 ->
-                        value = new StringListValue(buf.readCollection(ArrayList::new, FriendlyByteBuf::readUtf));
+                case 2 -> {
+                    int size = buf.readVarInt();
+                    List<String> strings = new ArrayList<>(size);
+                    for (int i = 0; i < size; i++) {
+                        strings.add(buf.readUtf());
+                    }
+                    value = new StringListValue(strings);
+                }
             }
             if (value == null) throw new RuntimeException("invalidated token: " + token);
             map.put(key, value);
