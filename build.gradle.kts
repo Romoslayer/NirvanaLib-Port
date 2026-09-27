@@ -354,14 +354,22 @@ dependencies {
 
     }
 
-    // fzzy_config has no NeoForge build published for 26.3 yet (only the Fabric one). Nothing in
-    // this mod's source touches its API, so skip the dependency for that one target instead of
-    // failing the build; the generated mod metadata still requires it at runtime. Remove this
-    // guard once me.fzzyhmstrs:fzzy_config:<version>+26.3+neoforge is published.
-    if (!(minecraft == "26.3" && loader == "neoforge")) {
-        modstitchModCompileOnly(fzzyString)
-        (fzzyString).runtimeOnly()
+    // Match Loot Beams' fzzy_config for 26.3 exactly. This dependency is published in this mod's
+    // POM and Loot Beams inherits it, so a different coordinate here would put two fzzy_config mods
+    // on Loot Beams' dev classpath. The plain 0.7.7 builds for 26.3 have sliders and scroll bars
+    // that can't be dragged; the fix releases are only on Modrinth, whose Maven omits fzzy's
+    // dependency metadata, so the Kotlin language provider it declares is added explicitly.
+    if (minecraft == "26.3") {
+        fzzyString = "maven.modrinth:fzzy-config:0.7.7+fix2+26.3" + (if (loader == "fabric") "" else "+neoforge")
+        if (loader == "fabric") {
+            "net.fabricmc:fabric-language-kotlin:1.13.11+kotlin.2.3.21".runtimeOnly()
+        } else {
+            "dev.nyon:KotlinLangForge:2.14.1-k2.4.20-3.1+neoforge".runtimeOnly()
+        }
     }
+
+    modstitchModCompileOnly(fzzyString)
+    (fzzyString).runtimeOnly()
 
     //loader-specified deps
     DependencyConfig.getDependencies(loader, minecraft).forEach { dep ->
